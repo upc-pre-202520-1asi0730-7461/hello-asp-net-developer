@@ -1,10 +1,19 @@
+using Acme.Hello.Platform.Generic.Domain.Model.Entities;
+using Acme.Hello.Platform.Generic.Interfaces.REST.Assemblers;
+using Acme.Hello.Platform.Generic.Interfaces.REST.Resources;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseSwagger();
+app.UseSwaggerUI();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -12,30 +21,28 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// Define the REST API endpoints
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
+// GET /greetings?firstName={firstName}&lastName={lastName}
+app.MapGet("/greetings", (string? firstName, string? lastName) =>
     {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
+        var developer = !string.IsNullOrEmpty(firstName) && !string.IsNullOrEmpty(lastName)
+            ? new Developer(firstName, lastName)
+            : null;
+        var response = GreetDeveloperResponseAssembler.ToResponseFromEntity(developer);
+        return Results.Ok(response);
     })
-    .WithName("GetWeatherForecast");
+    .WithName("GetGreeting")
+    .WithOpenApi();
 
+// POST /greetings
+// Body: { "firstName": "...", "lastName": "..." }
+app.MapPost("/greetings", (GreetDeveloperRequest request) =>
+    {
+        var developer = DeveloperAssembler.ToEntityFromRequest(request);
+        var response = GreetDeveloperResponseAssembler.ToResponseFromEntity(developer);
+        return Results.Created("/greetings", response);
+    })
+    .WithName("CreateGreeting")
+    .WithOpenApi();
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
